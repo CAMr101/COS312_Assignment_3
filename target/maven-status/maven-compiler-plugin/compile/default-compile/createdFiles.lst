@@ -1,0 +1,8 @@
+com\assignment\mlp\GridSearchExecutor.class
+com\assignment\mlp\HyperparameterConfig.class
+com\assignment\mlp\DataLoader.class
+com\assignment\mlp\UserInput.class
+com\assignment\mlp\GridSearchExecutor$TrainingTask.class
+com\assignment\mlp\MultilayerPerceptron.class
+com\assignment\mlp\GridSearchExecutor$GridSearchResult.class
+com\assignment\mlp\App.class
