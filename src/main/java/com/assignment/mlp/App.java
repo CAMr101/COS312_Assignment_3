@@ -1,6 +1,10 @@
 package com.assignment.mlp;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.Scanner;
 
 import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
@@ -112,7 +116,7 @@ public class App {
         for (int i = 0; i < epochs; i++) {
             model.fit(trainData);
             trainData.reset();
-            System.out.printf("Epoch %d/%d completed.%n", (i + 1), epochs);
+            System.out.printf("\rEpoch %d/%d completed.%n", (i + 1), epochs);
         }
         long trainingTime = (System.currentTimeMillis() - startTime) / 1000;
 
@@ -155,6 +159,7 @@ public class App {
     private static void predictMode(Scanner scanner, String OS_String) throws Exception {
         UtilityFunctions.clearConsole(OS_String);
         System.out.println("=== Prediction Mode ===\n");
+
         // Load saved model
         System.out.print("Enter path to saved model file (e.g., myModel.zip): ");
         String modelPath = scanner.nextLine().trim();
@@ -163,8 +168,13 @@ public class App {
         if (!modelFile.exists()) {
             throw new IllegalArgumentException("Model file not found: " + modelFile.getAbsolutePath());
         }
-
+        // Load the model
         MultiLayerNetwork model = MultiLayerNetwork.load(modelFile, true);
+        if (model == null) {
+            throw new IOException("Failed to load model from file: " + modelFile.getAbsolutePath());
+        }
+
+        UtilityFunctions.clearConsole(OS_String);
         System.out.println("Model loaded successfully: " + modelFile.getName());
 
         // Get data for prediction
@@ -172,20 +182,44 @@ public class App {
         String dataPath = scanner.nextLine().trim();
         int batchSize = 32; // Default batch size for prediction
 
-        DataSetIterator predictionData = DataLoader.loadData(dataPath, batchSize);
+        DataSetIterator predictionDataIterator = DataLoader.loadData(dataPath, batchSize);
 
-        // Make predictions
-        System.out.println("\nGenerating predictions...");
-        INDArray allPredictions = model.output(predictionData);
+        // Get output file path from user
+        System.out.print("Enter the path for the output CSV file (e.g., predictions.csv): ");
+        String outputCsvPath = scanner.nextLine().trim();
 
-        // Display predictions
-        System.out.println("\n--- Predictions ---");
-        for (int i = 0; i < allPredictions.rows(); i++) {
-            double prob = allPredictions.getDouble(i); // Get probability for the i-th sample
-            int predictedClass = prob > 0.5 ? 1 : 0;
-            System.out.printf("Sample %d: Predicted Class %d (Probability: %.4f)%n",
-                                i + 1, predictedClass, prob); // Start sample numbering from 1
+        // Make predictions and write to CSV
+        System.out.println("\nGenerating predictions and writing to CSV...");
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputCsvPath))) {
+            // CSV header
+            writer.write("Sample_ID,Predicted_Class,Probability\n");
+
+            int sampleIndex = 0;
+            // Iterate through the DataSetIterator to process data in batches
+            while (predictionDataIterator.hasNext()) {
+                INDArray features = predictionDataIterator.next().getFeatures();
+                INDArray batchPredictions = model.output(features);
+
+                for (int i = 0; i < batchPredictions.rows(); i++) {
+                    double prob = batchPredictions.getDouble(i);
+                    int predictedClass = prob > 0.5 ? 1 : 0;
+                    sampleIndex++;
+
+                    // Write to console
+                    System.out.printf("Sample %d: Predicted Class %d (Probability: %.4f)%n",
+                            sampleIndex, predictedClass, prob);
+
+                    // Write to CSV
+                    writer.write(String.format(Locale.ROOT, "%d,%d,%.4f%n", sampleIndex, predictedClass, prob));
+                }
+            }
+            System.out.println("\nPredictions successfully written to: " + outputCsvPath);
+
+        } catch (IOException e) {
+            System.err.println("Error writing predictions to CSV file: " + e.getMessage());
+            throw e;
         }
+
         System.out.println("\nPrediction process complete.");
     }
 }
